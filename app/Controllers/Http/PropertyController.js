@@ -1,6 +1,6 @@
-'use strict'
+"use strict";
 
-const Property = use('App/Models/Property');
+const Property = use("App/Models/Property");
 
 /** @typedef {import('@adonisjs/framework/src/Request')} Request */
 /** @typedef {import('@adonisjs/framework/src/Response')} Response */
@@ -19,8 +19,13 @@ class PropertyController {
    * @param {Response} ctx.response
    * @param {View} ctx.view
    */
-  async index ({ request, response, view }) {
-    const properties = Property.all()
+  async index({ request, response, view }) {
+    const { latitude, longitude } = request.all();
+
+    const properties = Property.query()
+      .with("images")
+      .nearBy(latitude, longitude, 10)
+      .fetch();
 
     return properties;
   }
@@ -43,7 +48,19 @@ class PropertyController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async store ({ request, response }) {
+  async store({ auth, request, response }) {
+    const { id } = auth.user;
+
+    const data = request.only([
+      "title",
+      "address",
+      "latitude",
+      "longitude",
+      "price",
+    ]);
+
+    const property = await Property.create({ ...data, user_id: id });
+    return property;
   }
 
   /**
@@ -55,9 +72,9 @@ class PropertyController {
    * @param {Response} ctx.response
    * @param {View} ctx.view
    */
-  async show ({ params, request, response, view }) {
+  async show({ params, request, response, view }) {
     const property = await Property.findOrFail(params.id);
-    await property.load('images');
+    await property.load("images");
 
     return property;
   }
@@ -80,7 +97,20 @@ class PropertyController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async update ({ params, request, response }) {
+  async update({ params, request, response }) {
+    const property = await Property.findOrFail(params.id);
+
+    const data = request.only([
+      "title",
+      "address",
+      "latitude",
+      "longitude",
+      "price",
+    ]);
+
+    property.merge(data);
+    await property.save();
+    return property;
   }
 
   /**
@@ -91,14 +121,14 @@ class PropertyController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async destroy ({ params, request, response }) {
+  async destroy({ params, request, response }) {
     const property = await Property.findOrFail(params.id);
-    if(property.user_id !== AuthenticatorAssertionResponse.user.id){
-      return response.status(401).send({error: 'Not authorized'})
+    if (property.user_id !== AuthenticatorAssertionResponse.user.id) {
+      return response.status(401).send({ error: "Not authorized" });
     }
 
-    await property.delete()
+    await property.delete();
   }
 }
 
-module.exports = PropertyController
+module.exports = PropertyController;
